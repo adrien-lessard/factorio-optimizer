@@ -1,12 +1,12 @@
 
 #include "module.h"
 
-Module Module::random(bool allow_prod)
+Module Module::random(std::mt19937& gen, bool allow_prod)
 {
-	int n = 10;
-	if(!allow_prod)
-		n = 7;
-	int r = rand() % n;
+	static auto with_prod = std::uniform_int_distribution<>(0, 9);
+	static auto without_prod = std::uniform_int_distribution<>(0, 6);
+	int r = allow_prod ? with_prod(gen) : without_prod(gen);
+
 	switch(r)
 	{
 	case 0:

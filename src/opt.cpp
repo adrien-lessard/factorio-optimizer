@@ -6,6 +6,8 @@
 #include <memory>
 #include <thread>
 #include <format>
+#include <csignal>
+#include <random>
 
 #include <nlohmann/json.hpp>
 
@@ -44,6 +46,8 @@ public:
 				missing_recipes.insert(ingredient["name"].get<string>());
 			this->recipe.push_back({amount, ingredient_id});
 		}
+
+		distrib = std::uniform_int_distribution<>(0, module_slots + beacon_slots - 1);
 	}
 
 	static bool module_comparator(Module &a, Module &b)
@@ -127,6 +131,8 @@ public:
 	double pollution_factor = 1.0;
 	double productivity_factor = 1.0;
 
+	std::uniform_int_distribution<> distrib;
+
 	static set<string> missing_recipes;
 };
 
@@ -176,24 +182,20 @@ public:
 		module_costs = 0;
 	}
 
-	void random_op()
+	void random_op(std::mt19937& gen)
 	{
-		auto& factorySection = factory_config[rand() % factory_config.size()];
-
-		if(factorySection->module_slots > 0)
+		auto section_distrib = std::uniform_int_distribution<>(0, factory_config.size() - 1);
+		auto& factorySection = factory_config[section_distrib(gen)];
+		int total_slots = factorySection->module_slots + factorySection->beacon_slots;
+		if(total_slots > 0)
 		{
-			// Change building module
-			if(rand() % 2 == 0)
-			{
-				auto module_slot = rand() % factorySection->module_slots;
-				factorySection->modules[module_slot] = Module::random(factorySection->allow_prod);
-			}
-			// Change beacon module
+			int module_to_change = factorySection->distrib(gen);
+			int beacon_to_change = module_to_change - factorySection->module_slots;
+
+			if(beacon_to_change >= 0)
+				factorySection->beacons[beacon_to_change] = Module::random(gen, false);
 			else
-			{
-				auto beacon_slot = rand() % factorySection->beacon_slots;
-				factorySection->beacons[beacon_slot] = Module::random(false);
-			}
+				factorySection->modules[module_to_change] = Module::random(gen, factorySection->allow_prod);
 		}
 	}
 
@@ -290,11 +292,11 @@ public:
 		total_pollution = std::reduce(generated_pollution.begin(), generated_pollution.end());
 	}
 
-	void run_build(bool randomize = false)
+	void run_build(std::mt19937& gen, bool randomize = false)
 	{
 		start_build_order();
 		if(randomize)
-			random_op();
+			random_op(gen);
 		build_order();
 		end_build_order();
 	}
@@ -356,6 +358,12 @@ public:
 // Optimize for pullution
 AllSciencePollutionOptimizer current_solution;
 AllSciencePollutionOptimizer best_solution;
+volatile bool stop_signal = false;
+
+void signal_handler(int signal)
+{
+	stop_signal = true;
+}
 
 std::mutex solution_mutex;
 void runner(const int thread_id, const int iterations, const int deviations_allowed)
@@ -365,15 +373,18 @@ void runner(const int thread_id, const int iterations, const int deviations_allo
 
 	int deviations_remaining = deviations_allowed;
 
+	std::random_device rd;
+	std::mt19937 gen(rd());
+
 	{
 		const std::lock_guard<std::mutex> lock(solution_mutex);
 		local_solution = best_solution;
 		local_best_solution = best_solution;
 	}
 
-	for(int i = 0; i < iterations; i++)
+	for(int i = 0; i < iterations && !stop_signal; i++)
 	{
-		local_solution.run_build(true);
+		local_solution.run_build(gen, true);
 
 		double pollution = local_solution.total_pollution;
 		double best_pollution = local_best_solution.total_pollution;
@@ -420,8 +431,6 @@ void runner(const int thread_id, const int iterations, const int deviations_allo
 
 int main()
 {
-	srand(time(NULL));
-
 	// Load recipes and entities
 	ifstream ifs_recipe("recipe.json");
 	ifstream ifs_entities("entities.json");
@@ -464,8 +473,12 @@ int main()
 	}
 
 	// Basic solution witout optimization
-	current_solution.run_build();
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	current_solution.run_build(gen);
 	best_solution = current_solution;
+
+	std::signal(SIGINT, signal_handler);
 
 	cout << "Done building list" << endl;
 

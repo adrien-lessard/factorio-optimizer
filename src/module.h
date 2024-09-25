@@ -1,12 +1,13 @@
 
 #pragma once
 #include <string>
+#include <random>
 
 class Module
 {
 public:
 	
-	static Module random(bool allow_prod);
+	static Module random(std::mt19937& gen, bool allow_prod);
 
 	double energy = 0;
 	double speed = 0;
