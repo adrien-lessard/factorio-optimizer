@@ -44,7 +44,7 @@ public:
 	{
 		energy = -0.4;
 		name = "\u001b[32mE2\u001b[0m";
-		cost = 10;
+		cost = 100;
 	}
 };
 
@@ -55,7 +55,7 @@ public:
 	{
 		energy = -0.5;
 		name = "\u001b[32mE3\u001b[0m";
-		cost = 100;
+		cost = 10000;
 	}
 };
 
@@ -79,7 +79,7 @@ public:
 		energy = 0.6;
 		speed = 0.3;
 		name = "\u001b[34mS2\u001b[0m";
-		cost = 10;
+		cost = 100;
 	}
 };
 
@@ -91,7 +91,7 @@ public:
 		energy = 0.7;
 		speed = 0.5;
 		name = "\u001b[34mS3\u001b[0m";
-		cost = 100;
+		cost = 10000;
 	}
 };
 
@@ -119,7 +119,7 @@ public:
 		productivity = 0.06;
 		pollution = 0.07;
 		name = "\u001b[31mP2\u001b[0m";
-		cost = 10;
+		cost = 100;
 	}
 };
 
@@ -133,6 +133,6 @@ public:
 		productivity = 0.1;
 		pollution = 0.1;
 		name = "\u001b[31mP3\u001b[0m";
-		cost = 100;
+		cost = 10000;
 	}
 };
