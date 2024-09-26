@@ -43,7 +43,16 @@ def recipe():
 			"enabled": False,
 			"type": "recipe",
 			"name": "advanced-oil-processing",
-			"ingredients": [],
+			"ingredients": [
+				{
+					"name": "crude-oil",
+					"amount": 100
+				},
+				{
+					"name": "water",
+					"amount": 50
+				}
+			],
 			"energy_required": 5,
 			"category": "raw",
 			"result_count": 1,
@@ -56,7 +65,16 @@ def recipe():
 			"enabled": False,
 			"type": "recipe",
 			"name": "heavy-oil-cracking",
-			"ingredients": [],
+			"ingredients": [
+				{
+					"name": "heavy-oil",
+					"amount": 40
+				},
+				{
+					"name": "water",
+					"amount": 30
+				}
+			],
 			"energy_required": 2,
 			"category": "raw",
 			"result_count": 1,
@@ -69,7 +87,16 @@ def recipe():
 			"enabled": False,
 			"type": "recipe",
 			"name": "light-oil-cracking",
-			"ingredients": [],
+			"ingredients": [
+				{
+					"name": "light-oil",
+					"amount": 30
+				},
+				{
+					"name": "water",
+					"amount": 30
+				}
+			],
 			"energy_required": 2,
 			"category": "raw",
 			"result_count": 1,
@@ -109,9 +136,9 @@ def recipe():
 			"type": "recipe",
 			"name": "water",
 			"ingredients": [],
-			"energy_required": 1,
+			"energy_required": 0.1,
 			"category": "raw",
-			"result_count": 1,
+			"result_count": 120,
 			"crafting_speed": 1,
 			"emissions_per_minute": 0,
 			"module_slots": 0
@@ -135,7 +162,7 @@ def recipe():
 			"type": "recipe",
 			"name": "heavy-oil",
 			"ingredients": [],
-			"energy_required": 1,
+			"energy_required": 0,
 			"category": "raw",
 			"result_count": 1,
 			"crafting_speed": 1,
@@ -148,7 +175,7 @@ def recipe():
 			"type": "recipe",
 			"name": "light-oil",
 			"ingredients": [],
-			"energy_required": 1,
+			"energy_required": 0,
 			"category": "raw",
 			"result_count": 1,
 			"crafting_speed": 1,
@@ -161,7 +188,7 @@ def recipe():
 			"type": "recipe",
 			"name": "petroleum-gas",
 			"ingredients": [],
-			"energy_required": 1,
+			"energy_required": 0,
 			"category": "raw",
 			"result_count": 1,
 			"crafting_speed": 1,
@@ -174,7 +201,7 @@ def recipe():
 			"type": "recipe",
 			"name": "copper-ore",
 			"ingredients": [],
-			"energy_required": 0.5,
+			"energy_required": 2,
 			"category": "raw",
 			"result_count": 1,
 			"crafting_speed": 1,
@@ -187,7 +214,7 @@ def recipe():
 			"type": "recipe",
 			"name": "iron-ore",
 			"ingredients": [],
-			"energy_required": 0.5,
+			"energy_required": 2,
 			"category": "raw",
 			"result_count": 1,
 			"crafting_speed": 1,
@@ -200,7 +227,7 @@ def recipe():
 			"type": "recipe",
 			"name": "stone",
 			"ingredients": [],
-			"energy_required": 0.5,
+			"energy_required": 2,
 			"category": "raw",
 			"result_count": 1,
 			"crafting_speed": 1,
@@ -213,7 +240,7 @@ def recipe():
 			"type": "recipe",
 			"name": "coal",
 			"ingredients": [],
-			"energy_required": 0.5,
+			"energy_required": 2,
 			"category": "raw",
 			"result_count": 1,
 			"crafting_speed": 1,

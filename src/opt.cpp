@@ -108,10 +108,22 @@ public:
 		if(energy_factor < 0.2)
 			energy_factor = 0.2;
 	}
+
+	double single_recipe_time()
+	{
+		return r_time / speed_factor / 60 / crafting_speed;
+	}
+
 	double pollute(double n_recepies)
 	{
-		return n_recepies * r_time / speed_factor / 60 * emissions_per_minute / crafting_speed * energy_factor * pollution_factor;
+		return n_recepies * single_recipe_time() * emissions_per_minute * energy_factor * pollution_factor;
 	}
+
+	double n_recipes(double qty_to_build)
+	{
+		return qty_to_build / r_yield / productivity_factor;
+	}
+
 	string name;
 	int id;
 	double r_time;
@@ -125,6 +137,8 @@ public:
 	vector<Module> beacons;
 	int module_cost;
 	bool allow_prod;
+	double total_buildings = 0.0;
+	double total_recipes = 0.0;
 
 	double energy_factor = 1.0;
 	double speed_factor = 1.0;
@@ -180,6 +194,8 @@ public:
 		fill(items_to_build.begin(), items_to_build.end(), 0);
 		fill(generated_pollution.begin(), generated_pollution.end(), 0);
 		module_costs = 0;
+		for(auto& f : factory_config)
+			f->total_buildings = 0;
 	}
 
 	void random_op(std::mt19937& gen)
@@ -205,7 +221,7 @@ public:
 
 		factorySection->compute_factors();
 
-		double n_recepies = qty / factorySection->r_yield / factorySection->productivity_factor;
+		double n_recepies = factorySection->n_recipes(qty);
 
 		for(auto& ingredient : factorySection->recipe)
 		{
@@ -213,7 +229,11 @@ public:
 			add_build(ingredient.second, req_qty);
 		}
 
-		items_to_build[id] += qty;
+		double buildings = n_recepies * factorySection->single_recipe_time();
+		factorySection->total_buildings += buildings;
+		factorySection->total_recipes += n_recepies;
+
+		items_to_build[id] += qty; // TODO also have an array for number of recipes // TODO rename to units_built
 		generated_pollution[id] += factorySection->pollute(n_recepies);
 	}
 
@@ -226,19 +246,18 @@ public:
 		int aop_id = names_to_id["advanced-oil-processing"];
 		int hoc_id = names_to_id["heavy-oil-cracking"];
 		int loc_id = names_to_id["light-oil-cracking"];
-		int co_id = names_to_id["crude-oil"];
 
 		auto& aopSection = factory_config[aop_id];
 		auto& hocSection = factory_config[hoc_id];
 		auto& locSection = factory_config[loc_id];
-		auto& coSection = factory_config[co_id];
 
 		aopSection->compute_factors();
 		hocSection->compute_factors();
 		locSection->compute_factors();
-		coSection->compute_factors();
 
-		double c1 = 100, c2 = 55, c3 = 45, c4 = 25, c5 =  30, c6 = 20, c7 = 40, c8 = 30;
+		double c1 = 100, c2 = 55, c3 = 45, c4 = 25; // advanced oil processing
+		double c5 =  30, c6 = 20; // light oil cracking
+		double c7 = 40, c8 = 30; // heavy oil cracking
 
 		c2 *= aopSection->productivity_factor;
 		c3 *= aopSection->productivity_factor;
@@ -246,35 +265,24 @@ public:
 		c6 *= locSection->productivity_factor;
 		c8 *= hocSection->productivity_factor;
 
-		double ratio_ho = (1) / (c4); // TODO that literal 1 is suspicious
+		double ratio_ho = (1) / (c4);
 		double ratio_lo = (c7) / (c3*c7+c4*c8);
 		double ratio_pg = (c5*c7) / (c2*c5*c7+c3*c6*c7+c4*c8*c6);
 
+		// Determine number of recipes to do for each process
 		double recipes_ho = req_ho * ratio_ho;
 		double recipes_lo = (req_lo - c3 * recipes_ho) * ratio_lo;
 		double recipes_pg = (req_pg - c2 * (recipes_ho + recipes_lo)) * ratio_pg;
-
 		double recipes_refinery = recipes_ho + recipes_lo + recipes_pg;
-
 		double converted_ho_to_lo = recipes_refinery * c4 - req_ho;
 		double converted_lo_to_pg = recipes_refinery * c3 + converted_ho_to_lo * c8 / c7 - req_lo;
-
 		double recipes_ho_crack = converted_ho_to_lo / c7;
 		double recipes_lo_crack = converted_lo_to_pg / c5;
 
-		double p;
-
-		items_to_build[aop_id] = recipes_refinery;
-		generated_pollution[aop_id] += aopSection->pollute(recipes_refinery);
-
-		items_to_build[hoc_id] = recipes_ho_crack;
-		generated_pollution[hoc_id] += hocSection->pollute(recipes_ho_crack);
-		
-		items_to_build[loc_id] = recipes_lo_crack;
-		generated_pollution[loc_id] += locSection->pollute(recipes_lo_crack);
-
-		items_to_build[co_id] = recipes_refinery * c1;
-		generated_pollution[co_id] += coSection->pollute(recipes_refinery * c1);
+		// Craft each process
+		add_build(aop_id, recipes_refinery * aopSection->productivity_factor);
+		add_build(hoc_id, recipes_ho_crack * hocSection->productivity_factor);
+		add_build(loc_id, recipes_lo_crack * locSection->productivity_factor);
 
 		double pg = 0; double lo = 0; double ho = 0;
 		pg += recipes_refinery * c2;
@@ -305,18 +313,20 @@ public:
 	{
 		cout << endl;
 		cout << left << setw(32) << setfill(' ') << "\u001b[4mFactory Section\u001b[0m";
-		cout << right << setw(32) << setfill(' ') << "\u001b[4mQuantity\u001b[0m";
+		cout << right << setw(32) << setfill(' ') << "\u001b[4mUnits Built\u001b[0m";
 		cout << right << setw(32) << setfill(' ') << "\u001b[4mPollution\u001b[0m";
+		cout << right << setw(32) << setfill(' ') << "\u001b[4mBuildings\u001b[0m";
 		cout << right << setw(32) << setfill(' ') << "\u001b[4mModules\u001b[0m";
 		cout << right << setw(32) << setfill(' ') << "\u001b[4mBeacons\u001b[0m";
 		cout << endl;
-		for(int id = 0; auto& qty : items_to_build)
+		for(int id = 0; auto& recipes : items_to_build)
 		{
-			if(qty > 0)
+			if(recipes > 0)
 			{
 				cout << left << setw(24) << setfill(' ') << factory_config[id]->name;
-				cout << right << setw(24) << setfill(' ') << fixed << setprecision(4) << qty;
+				cout << right << setw(24) << setfill(' ') << fixed << setprecision(4) << recipes;
 				cout << right << setw(24) << setfill(' ') << fixed << setprecision(4) << generated_pollution[id];
+				cout << right << setw(24) << setfill(' ') << fixed << setprecision(4) << factory_config[id]->total_buildings;
 				cout << left << setw(17) << setfill(' ') << " " << factory_config[id]->module_names();
 				cout << left << setw(16) << setfill(' ') << " " << factory_config[id]->beacon_names();
 				cout << endl;
