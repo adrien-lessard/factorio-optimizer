@@ -284,17 +284,6 @@ public:
 		add_build(hoc_id, recipes_ho_crack * hocSection->productivity_factor);
 		add_build(loc_id, recipes_lo_crack * locSection->productivity_factor);
 
-		double pg = 0; double lo = 0; double ho = 0;
-		pg += recipes_refinery * c2;
-		lo += recipes_refinery * c3;
-		ho += recipes_refinery * c4;
-
-		lo += recipes_ho_crack * c8;
-		ho -= recipes_ho_crack * c7;
-
-		pg += recipes_lo_crack * c6;
-		lo -= recipes_lo_crack * c5;
-
 		for(auto& factorySection : factory_config)
 			module_costs += factorySection->module_cost;
 		total_pollution = std::reduce(generated_pollution.begin(), generated_pollution.end());

@@ -206,7 +206,7 @@ def recipe():
 			"result_count": 1,
 			"crafting_speed": 1,
 			"emissions_per_minute": 12,
-			"module_slots": 2
+			"module_slots": 3
 		})
 
 		newdata.append( {
@@ -219,7 +219,7 @@ def recipe():
 			"result_count": 1,
 			"crafting_speed": 1,
 			"emissions_per_minute": 12,
-			"module_slots": 2
+			"module_slots": 3
 		})
 
 		newdata.append( {
@@ -232,7 +232,7 @@ def recipe():
 			"result_count": 1,
 			"crafting_speed": 1,
 			"emissions_per_minute": 12,
-			"module_slots": 2
+			"module_slots": 3
 		})
 
 		newdata.append( {
@@ -245,7 +245,7 @@ def recipe():
 			"result_count": 1,
 			"crafting_speed": 1,
 			"emissions_per_minute": 12,
-			"module_slots": 2
+			"module_slots": 3
 		})
 
 		for item in data:
