@@ -3,7 +3,6 @@
 #include <iostream>
 #include <map>
 #include <set>
-#include <memory>
 #include <thread>
 #include <format>
 #include <csignal>
@@ -26,17 +25,17 @@ public:
 
 	FactorySection(json& element, int element_id)
 	{
-		this->name = element["name"].get<string>();
-		this->id = element_id;
-		this->allow_prod = true;
-		this->r_time = element["energy_required"].get<double>();
-		this->r_yield = element["result_count"].get<double>();
-		this->crafting_speed = element["crafting_speed"].get<double>();
-		this->emissions_per_minute = element["emissions_per_minute"].get<double>();
-		this->module_slots = element["module_slots"].get<int>();
-		this->beacon_slots = N_BEACON_MODULES;
-		this->modules.resize(this->module_slots, NoModule());
-		this->beacons.resize(this->beacon_slots, NoModule());
+		name = element["name"].get<string>();
+		id = element_id;
+		allow_prod = true;
+		r_time = element["energy_required"].get<double>();
+		r_yield = element["result_count"].get<double>();
+		crafting_speed = element["crafting_speed"].get<double>();
+		emissions_per_minute = element["emissions_per_minute"].get<double>();
+		module_slots = element["module_slots"].get<int>();
+		beacon_slots = N_BEACON_MODULES;
+		modules.resize(module_slots, NoModule());
+		beacons.resize(beacon_slots, NoModule());
 
 		for (auto& ingredient : element["ingredients"])
 		{
@@ -44,24 +43,15 @@ public:
 			int ingredient_id = names_to_id[ingredient["name"].get<string>()];
 			if(ingredient_id == 0)
 				missing_recipes.insert(ingredient["name"].get<string>());
-			this->recipe.push_back({amount, ingredient_id});
+			recipe.push_back({amount, ingredient_id});
 		}
 
 		distrib = std::uniform_int_distribution<>(0, module_slots + beacon_slots - 1);
 	}
 
-	static bool module_comparator(Module &a, Module &b)
+	string get_module_names()
 	{
-		if(a.name == "__")
-			return false;
-		if(b.name == "__")
-			return true;
-		return a.name > b.name;
-	}
-
-	string module_names()
-	{
-		std::sort(modules.begin(), modules.end(), module_comparator);
+		std::sort(modules.begin(), modules.end());
 		string mstring;
 		for(int i = 0; i < module_slots; i++)
 			mstring += modules[i].name;
@@ -70,9 +60,9 @@ public:
 		return mstring;
 	}
 
-	string beacon_names()
+	string get_beacon_names()
 	{
-		std::sort(beacons.begin(), beacons.end(), module_comparator);
+		std::sort(beacons.begin(), beacons.end());
 		string mstring;
 		for(int i = 0; i < beacon_slots; i++)
 			mstring += beacons[i].name;
@@ -85,7 +75,7 @@ public:
 		speed_factor = 1.0;
 		pollution_factor = 1.0;
 		productivity_factor = 1.0;
-		module_cost = 0;
+		module_costs = 0;
 
 		for(auto& module : modules)
 		{
@@ -93,7 +83,7 @@ public:
 			speed_factor += module.speed;
 			pollution_factor += module.pollution;
 			productivity_factor += module.productivity;
-			module_cost += module.cost;
+			module_costs += module.cost;
 		}
 
 		for(auto& beacon : beacons)
@@ -102,7 +92,7 @@ public:
 			speed_factor += beacon.speed/2;
 			pollution_factor += beacon.pollution/2;
 			productivity_factor += beacon.productivity/2;
-			module_cost += beacon.cost;
+			module_costs += beacon.cost;
 		}
 
 		if(energy_factor < 0.2)
@@ -126,24 +116,29 @@ public:
 
 	string name;
 	int id;
+	bool allow_prod;
 	double r_time;
 	double r_yield;
+	double crafting_speed;
 	double emissions_per_minute;
 	int module_slots;
 	int beacon_slots;
-	double crafting_speed;
-	vector<pair<double, int>> recipe;
+
 	vector<Module> modules;
 	vector<Module> beacons;
-	int module_cost;
-	bool allow_prod;
-	double total_buildings = 0.0;
-	double total_recipes = 0.0;
 
-	double energy_factor = 1.0;
-	double speed_factor = 1.0;
-	double pollution_factor = 1.0;
-	double productivity_factor = 1.0;
+	vector<pair<double, int>> recipe;
+
+	double module_costs = 0;
+	double buildings = 0;
+	double recipes = 0;
+	double pollution = 0;
+	double units_built = 0;
+
+	double energy_factor = 1;
+	double speed_factor = 1;
+	double pollution_factor = 1;
+	double productivity_factor = 1;
 
 	std::uniform_int_distribution<> distrib;
 
@@ -161,7 +156,7 @@ public:
 	}
 
 	Solution(const Solution& sol)
-		: items_to_build(sol.items_to_build), generated_pollution(sol.generated_pollution), module_costs(sol.module_costs), total_pollution(sol.total_pollution)
+		: total_module_costs(sol.total_module_costs), total_buildings(sol.total_buildings), total_recipes(sol.total_recipes), total_pollution(sol.total_pollution), total_units_built(sol.total_units_built)
 	{
 		for(auto& e : factory_config)
 			e.reset();
@@ -174,10 +169,11 @@ public:
 	static void swap(Solution& a, Solution& b)
 	{
 		std::swap(a.factory_config, b.factory_config);
-		std::swap(a.items_to_build, b.items_to_build);
-		std::swap(a.generated_pollution, b.generated_pollution);
-		std::swap(a.module_costs, b.module_costs);
+		std::swap(a.total_module_costs, b.total_module_costs);
+		std::swap(a.total_buildings, b.total_buildings);
+		std::swap(a.total_recipes, b.total_recipes);
 		std::swap(a.total_pollution, b.total_pollution);
+		std::swap(a.total_units_built, b.total_units_built);
 	}
 
 	Solution& operator=(const Solution& sol)
@@ -188,14 +184,24 @@ public:
 	}
 
 	virtual inline bool operator< (const Solution& other) { return false; }
+	virtual inline double get_metric() { return -1; }
 
 	void start_build_order()
 	{
-		fill(items_to_build.begin(), items_to_build.end(), 0);
-		fill(generated_pollution.begin(), generated_pollution.end(), 0);
-		module_costs = 0;
 		for(auto& f : factory_config)
-			f->total_buildings = 0;
+		{
+			f->module_costs = 0;
+			f->buildings = 0;
+			f->recipes = 0;
+			f->pollution = 0;
+			f->units_built = 0;
+		}
+
+		total_module_costs = 0;
+		total_buildings = 0;
+		total_recipes = 0;
+		total_pollution = 0;
+		total_units_built = 0;
 	}
 
 	void random_op(std::mt19937& gen)
@@ -229,19 +235,17 @@ public:
 			add_build(ingredient.second, req_qty);
 		}
 
-		double buildings = n_recepies * factorySection->single_recipe_time();
-		factorySection->total_buildings += buildings;
-		factorySection->total_recipes += n_recepies;
-
-		items_to_build[id] += qty; // TODO also have an array for number of recipes // TODO rename to units_built
-		generated_pollution[id] += factorySection->pollute(n_recepies);
+		factorySection->buildings += n_recepies * factorySection->single_recipe_time();
+		factorySection->recipes += n_recepies;
+		factorySection->pollution += factorySection->pollute(n_recepies);
+		factorySection->units_built += qty;
 	}
 
 	void end_build_order()
 	{
-		double req_ho = items_to_build[names_to_id["heavy-oil"]];
-		double req_lo = items_to_build[names_to_id["light-oil"]];
-		double req_pg = items_to_build[names_to_id["petroleum-gas"]];
+		double req_ho = factory_config[names_to_id["heavy-oil"]]->units_built;
+		double req_lo = factory_config[names_to_id["light-oil"]]->units_built;
+		double req_pg = factory_config[names_to_id["petroleum-gas"]]->units_built;
 
 		int aop_id = names_to_id["advanced-oil-processing"];
 		int hoc_id = names_to_id["heavy-oil-cracking"];
@@ -284,9 +288,16 @@ public:
 		add_build(hoc_id, recipes_ho_crack * hocSection->productivity_factor);
 		add_build(loc_id, recipes_lo_crack * locSection->productivity_factor);
 
-		for(auto& factorySection : factory_config)
-			module_costs += factorySection->module_cost;
-		total_pollution = std::reduce(generated_pollution.begin(), generated_pollution.end());
+		for(auto& f : factory_config)
+			total_module_costs += f->module_costs;
+		for(auto& f : factory_config)
+			total_buildings += f->buildings;
+		for(auto& f : factory_config)
+			total_recipes += f->recipes;
+		for(auto& f : factory_config)
+			total_pollution += f->pollution;
+		for(auto& f : factory_config)
+			total_units_built += f->units_built;
 	}
 
 	void run_build(std::mt19937& gen, bool randomize = false)
@@ -303,21 +314,23 @@ public:
 		cout << endl;
 		cout << left << setw(32) << setfill(' ') << "\u001b[4mFactory Section\u001b[0m";
 		cout << right << setw(32) << setfill(' ') << "\u001b[4mUnits Built\u001b[0m";
+		cout << right << setw(32) << setfill(' ') << "\u001b[4mRecipes Completed\u001b[0m";
 		cout << right << setw(32) << setfill(' ') << "\u001b[4mPollution\u001b[0m";
 		cout << right << setw(32) << setfill(' ') << "\u001b[4mBuildings\u001b[0m";
 		cout << right << setw(32) << setfill(' ') << "\u001b[4mModules\u001b[0m";
 		cout << right << setw(32) << setfill(' ') << "\u001b[4mBeacons\u001b[0m";
 		cout << endl;
-		for(int id = 0; auto& recipes : items_to_build)
+		for(int id = 0; auto& f : factory_config)
 		{
-			if(recipes > 0)
+			if(f->units_built > 0)
 			{
-				cout << left << setw(24) << setfill(' ') << factory_config[id]->name;
-				cout << right << setw(24) << setfill(' ') << fixed << setprecision(4) << recipes;
-				cout << right << setw(24) << setfill(' ') << fixed << setprecision(4) << generated_pollution[id];
-				cout << right << setw(24) << setfill(' ') << fixed << setprecision(4) << factory_config[id]->total_buildings;
-				cout << left << setw(17) << setfill(' ') << " " << factory_config[id]->module_names();
-				cout << left << setw(16) << setfill(' ') << " " << factory_config[id]->beacon_names();
+				cout << left << setw(24) << setfill(' ') << f->name;
+				cout << right << setw(24) << setfill(' ') << fixed << setprecision(4) << f->units_built;
+				cout << right << setw(24) << setfill(' ') << fixed << setprecision(4) << f->recipes;
+				cout << right << setw(24) << setfill(' ') << fixed << setprecision(4) << f->pollution;
+				cout << right << setw(24) << setfill(' ') << fixed << setprecision(4) << f->buildings;
+				cout << left << setw(17) << setfill(' ') << " " << f->get_module_names();
+				cout << left << setw(16) << setfill(' ') << " " << f->get_beacon_names();
 				cout << endl;
 			}
 			id++;
@@ -327,10 +340,12 @@ public:
 	virtual void build_order(){}
 
 	vector<std::unique_ptr<FactorySection>> factory_config;
-	vector<double> items_to_build;
-	vector<double> generated_pollution;
-	int module_costs = 0;
-	double total_pollution = 0.0;
+
+	double total_module_costs = 0;
+	double total_buildings = 0;
+	double total_recipes = 0;
+	double total_pollution = 0;
+	double total_units_built = 0;
 };
 
 class AllSciencePollutionOptimizer : public Solution
@@ -338,25 +353,58 @@ class AllSciencePollutionOptimizer : public Solution
 public:
 	virtual void build_order()
 	{
-		add_build(names_to_id["rocket-part"], 100);
-		add_build(names_to_id["satellite"], 1);
-		add_build(names_to_id["automation-science-pack"], 1000);
-		add_build(names_to_id["logistic-science-pack"], 1000);
-		add_build(names_to_id["chemical-science-pack"], 1000);
-		add_build(names_to_id["military-science-pack"], 1000);
-		add_build(names_to_id["production-science-pack"], 1000);
-		add_build(names_to_id["utility-science-pack"], 1000);
+		double SPM = 50;
+		add_build(names_to_id["rocket-part"], SPM / 10);
+		add_build(names_to_id["satellite"], SPM / 1000);
+		add_build(names_to_id["automation-science-pack"], SPM);
+		add_build(names_to_id["logistic-science-pack"], SPM);
+		add_build(names_to_id["chemical-science-pack"], SPM);
+		add_build(names_to_id["military-science-pack"], SPM);
+		add_build(names_to_id["production-science-pack"], SPM);
+		add_build(names_to_id["utility-science-pack"], SPM);
 	}
 
-	virtual inline bool operator< (const AllSciencePollutionOptimizer& rhs) 
+	virtual inline bool operator< (const AllSciencePollutionOptimizer& rhs)
 	{
-		return total_pollution < rhs.total_pollution || (total_pollution == rhs.total_pollution && module_costs < rhs.module_costs);
+		return total_pollution < rhs.total_pollution || (total_pollution == rhs.total_pollution && total_module_costs < rhs.total_module_costs);
+	}
+
+	virtual inline double get_metric()
+	{
+		return total_pollution;
+	}
+};
+
+class FootprintOptimizer : public Solution
+{
+public:
+	virtual void build_order()
+	{
+		double SPM = 50;
+		add_build(names_to_id["rocket-part"], SPM / 10);
+		add_build(names_to_id["satellite"], SPM / 1000);
+		add_build(names_to_id["automation-science-pack"], SPM);
+		add_build(names_to_id["logistic-science-pack"], SPM);
+		add_build(names_to_id["chemical-science-pack"], SPM);
+		add_build(names_to_id["military-science-pack"], SPM);
+		add_build(names_to_id["production-science-pack"], SPM);
+		add_build(names_to_id["utility-science-pack"], SPM);
+	}
+
+	virtual inline bool operator< (const FootprintOptimizer& rhs)
+	{
+		return total_buildings < rhs.total_buildings || (total_buildings == rhs.total_buildings && total_module_costs < rhs.total_module_costs);
+	}
+
+	virtual inline double get_metric()
+	{
+		return total_buildings;
 	}
 };
 
 // Optimize for pullution
-AllSciencePollutionOptimizer current_solution;
-AllSciencePollutionOptimizer best_solution;
+FootprintOptimizer current_solution;
+FootprintOptimizer best_solution;
 volatile bool stop_signal = false;
 
 void signal_handler(int signal)
@@ -367,8 +415,8 @@ void signal_handler(int signal)
 std::mutex solution_mutex;
 void runner(const int thread_id, const int iterations, const int deviations_allowed)
 {
-	AllSciencePollutionOptimizer local_solution;
-	AllSciencePollutionOptimizer local_best_solution;
+	FootprintOptimizer local_solution;
+	FootprintOptimizer local_best_solution;
 
 	int deviations_remaining = deviations_allowed;
 
@@ -387,7 +435,7 @@ void runner(const int thread_id, const int iterations, const int deviations_allo
 
 		double pollution = local_solution.total_pollution;
 		double best_pollution = local_best_solution.total_pollution;
-		
+
 		if(local_solution < local_best_solution)
 		{
 			local_best_solution = local_solution;
@@ -414,14 +462,14 @@ void runner(const int thread_id, const int iterations, const int deviations_allo
 			// Update global solution if we are better
 			if(local_best_solution < best_solution)
 			{
-				cout << std::format("Iteration {} / {}. Thread {} got the best solution: {:.4f}", i, iterations, thread_id, local_best_solution.total_pollution) << std::endl;
+				cout << std::format("Iteration {} / {}. Thread {} got the best solution: {:.4f}", i, iterations, thread_id, local_best_solution.get_metric()) << endl;
 				best_solution = local_best_solution;
 			}
 
 			// Follow the global solution if we are worse
 			if(best_solution < local_best_solution)
 			{
-				cout << std::format("Thread {} resets its best solution", thread_id) << std::endl;
+				cout << std::format("Thread {} resets its best solution", thread_id) << endl;
 				local_best_solution = best_solution;
 			}
 		}
@@ -442,10 +490,6 @@ int main()
 	// Parse recipes and entities
 	json j = json::parse(ifs_recipe);
 	json j_entities = json::parse(ifs_entities);
-
-	// Initialize the current solution
-	current_solution.items_to_build.resize(j.size(), 0);
-	current_solution.generated_pollution.resize(j.size(), 0);
 
 	// Assign IDs to each recipe / entity
 	for(int id = 0; auto& element : j)
@@ -486,7 +530,7 @@ int main()
 	int deviations_allowed = 10;
 
 	// Optimization loop
-	constexpr int iterations = 10'000'000;
+	constexpr int iterations = 1'000'000;
 	unsigned int n_threads = std::thread::hardware_concurrency();
 	std::vector<std::unique_ptr<std::thread>> threads;
 	for(int i = 0; i < n_threads; i++)
@@ -498,8 +542,14 @@ int main()
 	}
 
 	best_solution.print();
-	cout << endl << "Pollution: " << best_solution.total_pollution << " Modules: " << best_solution.module_costs << endl;
 
+	cout << endl;
+	cout << "module_costs: " << best_solution.total_module_costs << endl;
+	cout << "buildings: " << best_solution.total_buildings << endl;
+	cout << "recipes: " << best_solution.total_recipes << endl;
+	cout << "pollution: " << best_solution.total_pollution << endl;
+	cout << "units_built: " << best_solution.total_units_built << endl;
+	cout << endl;
 	return 0;
 }
 

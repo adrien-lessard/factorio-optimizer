@@ -9,6 +9,15 @@ public:
 	
 	static Module random(std::mt19937& gen, bool allow_prod);
 
+	bool operator<(const Module& other)
+	{
+		if(name == "__")
+			return false;
+		if(other.name == "__")
+			return true;
+		return name > other.name;
+	}
+
 	double energy = 0;
 	double speed = 0;
 	double pollution = 0;
