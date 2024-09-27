@@ -182,8 +182,11 @@ public:
 		return *this;
 	}
 
-	virtual inline bool operator< (const Solution& other) { return false; }
-	virtual inline double get_metric() { return -1; }
+	virtual inline bool operator< (const Solution& rhs)
+	{
+		return get_metric() < rhs.get_metric();
+	}
+	virtual inline double get_metric() const { return -1; }
 
 	void start_build_order()
 	{
@@ -264,7 +267,7 @@ public:
 		hocSection->compute_factors();
 		locSection->compute_factors();
 
-		double c1 = 100, c2 = 55, c3 = 45, c4 = 25; // advanced oil processing
+		double c2 = 55, c3 = 45, c4 = 25; // advanced oil processing
 		double c5 =  30, c6 = 20; // light oil cracking
 		double c7 = 40, c8 = 30; // heavy oil cracking
 
@@ -368,7 +371,7 @@ public:
 		add_build(names_to_id["utility-science-pack"], SPM);
 	}
 
-	virtual inline bool operator< (const AllSciencePollutionOptimizer& rhs)
+	virtual inline bool operator< (const Solution& rhs)
 	{
 		return total_pollution < rhs.total_pollution || (total_pollution == rhs.total_pollution && total_module_costs < rhs.total_module_costs);
 	}
@@ -396,7 +399,7 @@ public:
 		add_build(names_to_id["utility-science-pack"], SPM);
 	}
 
-	virtual inline bool operator< (const FootprintOptimizer& rhs)
+	virtual inline bool operator< (const Solution& rhs)
 	{
 		return total_buildings < rhs.total_buildings || (total_buildings == rhs.total_buildings && total_module_costs < rhs.total_module_costs);
 	}
@@ -427,11 +430,11 @@ int main()
 		names_to_id.insert({element["name"].get<string>(), id++});
 
 	// Initialize each factory section
-	AllSciencePollutionOptimizer footprint_problem;
+	AllSciencePollutionOptimizer problem;
 	for(int id = 0; auto& element : j)
 	{
 		auto factorySection = std::make_unique<FactorySection>(element, id);
-		footprint_problem.factory_config.emplace_back(std::move(factorySection));
+		problem.factory_config.emplace_back(std::move(factorySection));
 		id++;
 	}
 
@@ -444,11 +447,11 @@ int main()
 	{
 		auto id = names_to_id[element.get<string>()];
 		if(id != 0)
-			footprint_problem.factory_config[id]->allow_prod = false; // careful, inaccurate
+			problem.factory_config[id]->allow_prod = false; // careful, inaccurate
 	}
 
-	Optimizer<AllSciencePollutionOptimizer> problem(footprint_problem);
-	AllSciencePollutionOptimizer solution = problem.run(1000000, 10);
+	Optimizer<AllSciencePollutionOptimizer> solver(problem);
+	AllSciencePollutionOptimizer solution = solver.run(1000000, 10);
 
 	solution.print();
 

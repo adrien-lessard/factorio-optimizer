@@ -11,7 +11,7 @@
 
 volatile static bool stop_signal = false;
 
-static void stop(int signal)
+static void stop([[maybe_unused]] int signal)
 {
 	stop_signal = true;
 }
@@ -31,7 +31,7 @@ public:
 		std::signal(SIGINT, stop);
 		unsigned int n_threads = std::thread::hardware_concurrency();
 		std::vector<std::unique_ptr<std::thread>> threads;
-		for(int i = 0; i < n_threads; i++)
+		for(unsigned i = 0; i < n_threads; i++)
 			threads.emplace_back(std::make_unique<std::thread>(&Optimizer<T>::runner, this, i, iterations, deviations_allowed));
 		for(auto& thread : threads)
 		{

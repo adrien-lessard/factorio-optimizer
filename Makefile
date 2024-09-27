@@ -12,7 +12,7 @@ DEPS := $(OBJS:.o=.d)
 INC_DIRS := $(shell find $(SRC_DIRS) -type d)
 INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
-CPPFLAGS ?= $(INC_FLAGS) -MMD -MP -g -O3 -march=native -std=c++20 -Wshadow
+CPPFLAGS ?= $(INC_FLAGS) -MMD -MP -g -O3 -march=native -std=c++20 -Wall -Wextra -Wshadow
 
 all: $(BUILD_DIR)/$(TARGET_EXEC)
 
