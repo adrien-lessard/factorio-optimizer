@@ -7,6 +7,7 @@
 #include <format>
 #include <csignal>
 #include <random>
+#include <mutex>
 
 #include <nlohmann/json.hpp>
 
@@ -150,9 +151,11 @@ set<string> FactorySection::missing_recipes;
 class Solution
 {
 public:
-	Solution()
+	Solution() { }
+	virtual ~Solution()
 	{
-
+		for(auto& e : factory_config)
+			e.reset();
 	}
 
 	Solution(const Solution& sol)
@@ -357,6 +360,7 @@ public:
 class AllSciencePollutionOptimizer : public Solution
 {
 public:
+	virtual ~AllSciencePollutionOptimizer() {}
 	virtual void build_order()
 	{
 		double SPM = 50;
@@ -384,6 +388,7 @@ public:
 class FootprintOptimizer : public Solution
 {
 public:
+	virtual ~FootprintOptimizer() {}
 	virtual void build_order()
 	{
 		double SPM = 50;
