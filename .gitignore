@@ -2,3 +2,6 @@ build
 *.out
 *.json
 *.lua
+.settings
+.cproject
+.project

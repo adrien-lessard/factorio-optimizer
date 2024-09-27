@@ -3,15 +3,11 @@
 #include <iostream>
 #include <map>
 #include <set>
-#include <thread>
-#include <format>
-#include <csignal>
-#include <random>
-#include <mutex>
 
 #include <nlohmann/json.hpp>
 
 #include "module.h"
+#include "optimizer.h"
 
 using json = nlohmann::json;
 using namespace std;
@@ -309,11 +305,9 @@ public:
 			total_units_built += f->units_built;
 	}
 
-	void run_build(std::mt19937& gen, bool randomize = false)
+	void compute()
 	{
 		start_build_order();
-		if(randomize)
-			random_op(gen);
 		build_order();
 		end_build_order();
 	}
@@ -413,80 +407,6 @@ public:
 	}
 };
 
-// Optimize for pullution
-FootprintOptimizer current_solution;
-FootprintOptimizer best_solution;
-volatile bool stop_signal = false;
-
-void signal_handler(int signal)
-{
-	stop_signal = true;
-}
-
-std::mutex solution_mutex;
-void runner(const int thread_id, const int iterations, const int deviations_allowed)
-{
-	FootprintOptimizer local_solution;
-	FootprintOptimizer local_best_solution;
-
-	int deviations_remaining = deviations_allowed;
-
-	std::random_device rd;
-	std::mt19937 gen(rd());
-
-	{
-		const std::lock_guard<std::mutex> lock(solution_mutex);
-		local_solution = best_solution;
-		local_best_solution = best_solution;
-	}
-
-	for(int i = 0; i < iterations && !stop_signal; i++)
-	{
-		local_solution.run_build(gen, true);
-
-		double pollution = local_solution.total_pollution;
-		double best_pollution = local_best_solution.total_pollution;
-
-		if(local_solution < local_best_solution)
-		{
-			local_best_solution = local_solution;
-			deviations_remaining = deviations_allowed;
-		}
-		else
-		{
-			if(deviations_remaining == 0)
-			{
-				local_solution = local_best_solution;
-				deviations_remaining = deviations_allowed;
-			}
-			else
-			{
-				deviations_remaining--;
-			}
-		}
-
-		// Every once in a while, compare the thread solution to the global solution
-		if(i % 1000 == 0)
-		{
-			const std::lock_guard<std::mutex> lock(solution_mutex);
-
-			// Update global solution if we are better
-			if(local_best_solution < best_solution)
-			{
-				cout << std::format("Iteration {} / {}. Thread {} got the best solution: {:.4f}", i, iterations, thread_id, local_best_solution.get_metric()) << endl;
-				best_solution = local_best_solution;
-			}
-
-			// Follow the global solution if we are worse
-			if(best_solution < local_best_solution)
-			{
-				cout << std::format("Thread {} resets its best solution", thread_id) << endl;
-				local_best_solution = best_solution;
-			}
-		}
-	}
-}
-
 int main()
 {
 	// Load recipes and entities
@@ -507,10 +427,11 @@ int main()
 		names_to_id.insert({element["name"].get<string>(), id++});
 
 	// Initialize each factory section
+	AllSciencePollutionOptimizer footprint_problem;
 	for(int id = 0; auto& element : j)
 	{
 		auto factorySection = std::make_unique<FactorySection>(element, id);
-		current_solution.factory_config.emplace_back(std::move(factorySection));
+		footprint_problem.factory_config.emplace_back(std::move(factorySection));
 		id++;
 	}
 
@@ -523,43 +444,20 @@ int main()
 	{
 		auto id = names_to_id[element.get<string>()];
 		if(id != 0)
-			current_solution.factory_config[id]->allow_prod = false; // careful, inaccurate
+			footprint_problem.factory_config[id]->allow_prod = false; // careful, inaccurate
 	}
 
-	// Basic solution witout optimization
-	std::random_device rd;
-	std::mt19937 gen(rd());
-	current_solution.run_build(gen);
-	best_solution = current_solution;
+	Optimizer<AllSciencePollutionOptimizer> problem(footprint_problem);
+	AllSciencePollutionOptimizer solution = problem.run(1000000, 10);
 
-	std::signal(SIGINT, signal_handler);
-
-	cout << "Done building list" << endl;
-
-	// Accept deviations from the best solutions up to a certain point
-	// This reduces the chances to get stuck on a local minimum
-	int deviations_allowed = 10;
-
-	// Optimization loop
-	constexpr int iterations = 1'000'000;
-	unsigned int n_threads = std::thread::hardware_concurrency();
-	std::vector<std::unique_ptr<std::thread>> threads;
-	for(int i = 0; i < n_threads; i++)
-		threads.emplace_back(std::make_unique<std::thread>(&runner, i, iterations, deviations_allowed));
-	for(auto& thread : threads)
-	{
-		thread->join();
-		thread.reset();
-	}
-
-	best_solution.print();
+	solution.print();
 
 	cout << endl;
-	cout << "module_costs: " << best_solution.total_module_costs << endl;
-	cout << "buildings: " << best_solution.total_buildings << endl;
-	cout << "recipes: " << best_solution.total_recipes << endl;
-	cout << "pollution: " << best_solution.total_pollution << endl;
-	cout << "units_built: " << best_solution.total_units_built << endl;
+	cout << "module_costs: " << solution.total_module_costs << endl;
+	cout << "buildings: " << solution.total_buildings << endl;
+	cout << "recipes: " << solution.total_recipes << endl;
+	cout << "pollution: " << solution.total_pollution << endl;
+	cout << "units_built: " << solution.total_units_built << endl;
 	cout << endl;
 	return 0;
 }
