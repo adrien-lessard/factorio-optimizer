@@ -235,7 +235,13 @@ public:
 			add_build(ingredient.second, req_qty);
 		}
 
-		factorySection->buildings += n_recepies * factorySection->single_recipe_time();
+		// Number of buildings increases due to beacons
+		int building_multiplier = 1;
+		for(auto& b : factorySection->beacons)
+			if(b.name != "__")
+				building_multiplier++;
+
+		factorySection->buildings += n_recepies * factorySection->single_recipe_time() * building_multiplier;
 		factorySection->recipes += n_recepies;
 		factorySection->pollution += factorySection->pollute(n_recepies);
 		factorySection->units_built += qty;
