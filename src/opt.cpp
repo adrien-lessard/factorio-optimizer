@@ -451,7 +451,7 @@ int main()
 	}
 
 	Optimizer<AllSciencePollutionOptimizer> solver(problem);
-	AllSciencePollutionOptimizer solution = solver.run(1000000, 10);
+	AllSciencePollutionOptimizer solution = solver.run(1'000'000, 10);
 
 	solution.print();
 

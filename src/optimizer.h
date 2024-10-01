@@ -26,7 +26,7 @@ public:
 		best_solution.compute();
 	}
 
-	T run(const int iterations, const int deviations_allowed)
+	T& run(const int iterations, const int deviations_allowed)
 	{
 		std::signal(SIGINT, stop);
 		unsigned int n_threads = std::thread::hardware_concurrency();
@@ -84,23 +84,29 @@ private:
 
 			// Every once in a while, compare the thread solution to the global solution
 			if(i % 1000 == 0)
-			{
-				const std::lock_guard<std::mutex> lock(solution_mutex);
+				evaluate_best(local_best_solution, i, thread_id, iterations);
+		}
 
-				// Update global solution if we are better
-				if(local_best_solution < best_solution)
-				{
-					std::cout << std::format("Iteration {} / {}. Thread {} got the best solution: {:.4f}", i, iterations, thread_id, local_best_solution.get_metric()) << std::endl;
-					best_solution = local_best_solution;
-				}
+		// Compare one last time before ending
+		evaluate_best(local_best_solution, iterations, thread_id, iterations);
+	}
 
-				// Follow the global solution if we are worse
-				if(best_solution < local_best_solution)
-				{
-					std::cout << std::format("Thread {} resets its best solution", thread_id) << std::endl;
-					local_best_solution = best_solution;
-				}
-			}
+	void evaluate_best(T& local_best_solution, const int i, const int thread_id, const int iterations)
+	{
+		const std::lock_guard<std::mutex> lock(solution_mutex);
+
+		// Update global solution if we are better
+		if(local_best_solution < best_solution)
+		{
+			std::cout << std::format("Iteration {} / {}. Thread {} got the best solution: {:.4f}", i, iterations, thread_id, local_best_solution.get_metric()) << std::endl;
+			best_solution = local_best_solution;
+		}
+
+		// Follow the global solution if we are worse
+		if(best_solution < local_best_solution)
+		{
+			std::cout << std::format("Thread {} resets its best solution", thread_id) << std::endl;
+			local_best_solution = best_solution;
 		}
 	}
 
