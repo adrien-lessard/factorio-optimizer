@@ -8,11 +8,13 @@ def download(url, file):
 
 def recipe():
 	lines = ['data = \n']
+	ll = 0
 	with open('recipe.lua', 'r') as f:
 		f.readline()
 		for line in f:
-			lines.append(line)
-	lines.pop()
+			if ll > 20:
+				lines.append(line)
+			ll += 1
 	lines.append('local lunajson = require \'lunajson\'\n')
 	lines.append('print(lunajson.encode(data))\n')
 
